@@ -27,6 +27,7 @@ Google và TripAdvisor chặn scraping trực tiếp, nên dùng API chính th�
 | Nguồn | Key | Ghi chú |
 |---|---|---|
 | TripAdvisor (Content API) | `TRIPADVISOR_API_KEY` ([đăng ký](https://www.tripadvisor.com/developers)) | `location_id` = `27950353` lấy từ URL, đã điền sẵn. Gói Discover chỉ trả tối đa 3 review mới nhất mỗi ngôn ngữ (gói Growth 5), nên cần gọi cron đủ dày; mặc định theo dõi `en,vi`. |
+| TripAdvisor (SerpApi) | dùng chung `SERPAPI_KEY` | Không cần gói TripAdvisor. Tự dùng khi `TRIPADVISOR_API_KEY` để trống. Mỗi lần kiểm tra tốn thêm 1 lượt SerpApi. |
 | Google Maps (A) – SerpApi | `SERPAPI_KEY` ([serpapi.com](https://serpapi.com)) | Sắp xếp mới nhất, đáng tin cậy nhất. Gói free ~100 lượt/tháng, nên gọi cron thưa (vd. 6 tiếng/lần). |
 | Google Maps (B) – Places API (New) | `GOOGLE_API_KEY` | Chỉ trả 5 review "liên quan nhất", **có thể bỏ sót review mới**. |
 

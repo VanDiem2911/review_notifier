@@ -80,6 +80,27 @@ async function tripadvisor(): Promise<Review[]> {
   return out;
 }
 
+/** TripAdvisor qua SerpApi (engine tripadvisor_reviews): dùng chung SERPAPI_KEY, không cần gói TripAdvisor. */
+async function tripadvisorSerpApi(): Promise<Review[]> {
+  const qs = new URLSearchParams({
+    engine: "tripadvisor_reviews",
+    place_id: env("TRIPADVISOR_LOCATION_ID"),
+    api_key: env("SERPAPI_KEY"),
+  });
+  const data = await fetchJson<any>(`https://serpapi.com/search.json?${qs}`);
+  if (data.error) throw new Error(`SerpApi: ${data.error}`);
+  return (data.reviews ?? []).map((r: any): Review => ({
+    id: String(r.review_id),
+    source: "TripAdvisor",
+    place: env("TRIPADVISOR_NAME") || "TripAdvisor",
+    author: r.author?.display_name ?? r.author?.username ?? "Ẩn danh",
+    rating: r.rating,
+    text: r.title ? `${r.title}\n${r.snippet ?? ""}`.trim() : (r.snippet ?? ""),
+    date: r.date ?? "",
+    url: r.link ?? "",
+  }));
+}
+
 export function enabledSources(): { name: SourceName; fetch: () => Promise<Review[]> }[] {
   const list: { name: SourceName; fetch: () => Promise<Review[]> }[] = [];
   if (env("GOOGLE_SOURCE") === "browser" && (env("GOOGLE_PLACE_ID") || env("GOOGLE_MAPS_URL")))
@@ -87,5 +108,6 @@ export function enabledSources(): { name: SourceName; fetch: () => Promise<Revie
   else if (env("SERPAPI_KEY") && env("GOOGLE_DATA_ID")) list.push({ name: "google", fetch: googleSerpApi });
   else if (env("GOOGLE_API_KEY") && env("GOOGLE_PLACE_ID")) list.push({ name: "google", fetch: googlePlaces });
   if (env("TRIPADVISOR_API_KEY") && env("TRIPADVISOR_LOCATION_ID")) list.push({ name: "tripadvisor", fetch: tripadvisor });
+  else if (env("SERPAPI_KEY") && env("TRIPADVISOR_LOCATION_ID")) list.push({ name: "tripadvisor", fetch: tripadvisorSerpApi });
   return list;
 }
