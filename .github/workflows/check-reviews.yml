@@ -1,0 +1,19 @@
+name: Check reviews
+
+on:
+  schedule:
+    - cron: "0 */8 * * *" # mỗi 8 tiếng (giờ UTC); mỗi lần chạy tốn 1 lượt SerpApi
+  workflow_dispatch: # cho phép bấm chạy tay trong tab Actions
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --silent --show-error --fail-with-body --max-time 90 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron"
