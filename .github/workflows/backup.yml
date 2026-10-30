@@ -1,0 +1,70 @@
+name: Backup to Google Drive
+
+on:
+  schedule:
+    - cron: "0 19 * * *" # 02:00 giờ Việt Nam hằng ngày: sao lưu DB, giữ 7 bản
+    - cron: "0 20 * * 0" # 03:00 Chủ nhật: sao lưu toàn bộ web, giữ 3 bản
+  workflow_dispatch: # bấm chạy tay trong tab Actions (dùng khi demo)
+    inputs:
+      kind:
+        description: "Loại sao lưu"
+        type: choice
+        options: [db, web]
+        default: db
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      # --- Chỉnh khi tích hợp vào dự án khác ---
+      REMOTE: gdrive:Backup-TourWeb # tên remote rclone : thư mục gốc trên Drive
+      KEEP_DB: 7 # số bản DB giữ lại
+      KEEP_WEB: 3 # số bản web giữ lại
+      # ------------------------------------------
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Chọn loại sao lưu
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "KIND=${{ inputs.kind }}" >> "$GITHUB_ENV"
+          elif [ "${{ github.event.schedule }}" = "0 20 * * 0" ]; then
+            echo "KIND=web" >> "$GITHUB_ENV"
+          else
+            echo "KIND=db" >> "$GITHUB_ENV"
+          fi
+
+      - name: Cài rclone và cấu hình Google Drive
+        run: |
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone
+          printf '%s\n' "${{ secrets.RCLONE_CONF }}" > ~/.config/rclone/rclone.conf
+
+      - name: Cài mongodump
+        if: env.KIND == 'db'
+        run: |
+          curl -fsSL https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.12.0.tgz | tar xz
+          echo "$PWD/mongodb-database-tools-ubuntu2204-x86_64-100.12.0/bin" >> "$GITHUB_PATH"
+
+      - name: Tạo file sao lưu
+        run: |
+          mkdir -p out
+          STAMP=$(TZ=Asia/Ho_Chi_Minh date +%F)
+          if [ "$KIND" = "db" ]; then
+            mongodump --uri="$MONGODB_URI" --archive="out/db-$STAMP.archive.gz" --gzip
+            echo "KEEP=$KEEP_DB" >> "$GITHUB_ENV"
+          else
+            tar -czf "out/web-$STAMP.tar.gz" --exclude=./out --exclude=./node_modules --exclude=./.next .
+            echo "KEEP=$KEEP_WEB" >> "$GITHUB_ENV"
+          fi
+          ls -lh out
+
+      - name: Đẩy lên Google Drive và xoá bản cũ
+        run: |
+          rclone copy out "$REMOTE/$KIND"
+          # tên file chứa ngày nên sắp xếp theo tên là sắp theo thời gian
+          rclone lsf "$REMOTE/$KIND" | sort -r | tail -n +$((KEEP + 1)) | while read -r f; do
+            rclone deletefile "$REMOTE/$KIND/$f"
+          done
+          rclone ls "$REMOTE/$KIND"
